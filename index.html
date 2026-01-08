@@ -1,0 +1,468 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="Finance Tracker">
+  <title>Finance Tracker</title>
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { 
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh;
+    }
+    .container { max-width: 1200px; margin: 0 auto; padding: 20px; }
+    
+    /* Navigation */
+    .nav { 
+      background: white; 
+      display: flex; 
+      gap: 5px; 
+      border-radius: 15px; 
+      padding: 5px;
+      margin-bottom: 20px;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+    }
+    .nav-btn {
+      flex: 1;
+      padding: 15px;
+      border: none;
+      background: transparent;
+      cursor: pointer;
+      border-radius: 10px;
+      font-weight: 600;
+      transition: all 0.3s;
+      color: #666;
+    }
+    .nav-btn.active {
+      background: linear-gradient(135deg, #667eea, #764ba2);
+      color: white;
+    }
+    
+    /* Cards */
+    .card {
+      background: white;
+      border-radius: 20px;
+      padding: 30px;
+      box-shadow: 0 10px 40px rgba(0,0,0,0.1);
+      margin-bottom: 20px;
+    }
+    .card h2 { color: #667eea; margin-bottom: 20px; }
+    
+    /* Balance Display */
+    .balance {
+      font-size: 48px;
+      font-weight: bold;
+      color: #333;
+      margin: 20px 0;
+    }
+    
+    /* Account Cards */
+    .account-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+      gap: 20px;
+      margin: 20px 0;
+    }
+    .account-card {
+      padding: 25px;
+      border-radius: 15px;
+      color: white;
+    }
+    .checking { background: linear-gradient(135deg, #667eea, #764ba2); }
+    .roth { background: linear-gradient(135deg, #f093fb, #f5576c); }
+    .k401 { background: linear-gradient(135deg, #4facfe, #00f2fe); }
+    .account-card h3 { font-size: 14px; opacity: 0.9; margin-bottom: 10px; }
+    .account-card .amount { font-size: 32px; font-weight: bold; }
+    
+    /* Button */
+    .btn {
+      background: linear-gradient(135deg, #667eea, #764ba2);
+      color: white;
+      border: none;
+      padding: 15px 30px;
+      border-radius: 10px;
+      font-size: 16px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: transform 0.2s;
+    }
+    .btn:hover { transform: translateY(-2px); }
+    .btn:active { transform: translateY(0); }
+    
+    /* Form */
+    .form-group { margin-bottom: 15px; }
+    .form-group label {
+      display: block;
+      margin-bottom: 5px;
+      font-weight: 600;
+      color: #333;
+    }
+    .form-group input, .form-group select {
+      width: 100%;
+      padding: 12px;
+      border: 2px solid #e0e0e0;
+      border-radius: 8px;
+      font-size: 16px;
+    }
+    .form-group input:focus, .form-group select:focus {
+      outline: none;
+      border-color: #667eea;
+    }
+    
+    /* Transaction List */
+    .transaction {
+      background: #f8f9fa;
+      padding: 15px;
+      border-radius: 10px;
+      margin-bottom: 10px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .transaction.income { border-left: 4px solid #4caf50; }
+    .transaction.expense { border-left: 4px solid #f44336; }
+    .transaction-amount {
+      font-size: 20px;
+      font-weight: bold;
+    }
+    .transaction-amount.income { color: #4caf50; }
+    .transaction-amount.expense { color: #f44336; }
+    
+    /* Modal */
+    .modal {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0,0,0,0.5);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+      z-index: 1000;
+    }
+    .modal-content {
+      background: white;
+      border-radius: 20px;
+      padding: 30px;
+      max-width: 500px;
+      width: 100%;
+      max-height: 90vh;
+      overflow-y: auto;
+    }
+    
+    @media (max-width: 768px) {
+      .balance { font-size: 36px; }
+      .account-card .amount { font-size: 24px; }
+      .nav-btn { padding: 12px; font-size: 14px; }
+    }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+  
+  <script>
+    const { useState, useEffect } = React;
+    
+    // Simple storage wrapper
+    const store = {
+      get: (key) => {
+        try {
+          return JSON.parse(localStorage.getItem(key));
+        } catch {
+          return null;
+        }
+      },
+      set: (key, value) => {
+        localStorage.setItem(key, JSON.stringify(value));
+      }
+    };
+    
+    function App() {
+      const [tab, setTab] = useState('networth');
+      const [checkingBalance, setCheckingBalance] = useState(0);
+      const [checkingTransactions, setCheckingTransactions] = useState([]);
+      const [rothBalance, setRothBalance] = useState(0);
+      const [k401Balance, setK401Balance] = useState(0);
+      const [showModal, setShowModal] = useState(false);
+      const [formData, setFormData] = useState({
+        type: 'expense',
+        amount: '',
+        category: '',
+        description: '',
+        date: new Date().toISOString().split('T')[0]
+      });
+      
+      // Load data on mount
+      useEffect(() => {
+        const checking = store.get('checkingBalance') || 0;
+        const transactions = store.get('checkingTransactions') || [];
+        const roth = store.get('rothBalance') || 0;
+        const k401 = store.get('k401Balance') || 0;
+        
+        setCheckingBalance(checking);
+        setCheckingTransactions(transactions);
+        setRothBalance(roth);
+        setK401Balance(k401);
+      }, []);
+      
+      const totalNetWorth = checkingBalance + rothBalance + k401Balance;
+      
+      const addTransaction = () => {
+        if (!formData.amount || !formData.category) {
+          alert('Please fill in all required fields');
+          return;
+        }
+        
+        const transaction = {
+          ...formData,
+          amount: parseFloat(formData.amount),
+          id: Date.now()
+        };
+        
+        const newTransactions = [transaction, ...checkingTransactions];
+        setCheckingTransactions(newTransactions);
+        store.set('checkingTransactions', newTransactions);
+        
+        // Update balance
+        const newBalance = transaction.type === 'income' 
+          ? checkingBalance + transaction.amount
+          : checkingBalance - transaction.amount;
+        setCheckingBalance(newBalance);
+        store.set('checkingBalance', newBalance);
+        
+        setShowModal(false);
+        setFormData({
+          type: 'expense',
+          amount: '',
+          category: '',
+          description: '',
+          date: new Date().toISOString().split('T')[0]
+        });
+      };
+      
+      const updateRothBalance = (amount) => {
+        const newBalance = parseFloat(amount) || 0;
+        setRothBalance(newBalance);
+        store.set('rothBalance', newBalance);
+      };
+      
+      const update401KBalance = (amount) => {
+        const newBalance = parseFloat(amount) || 0;
+        setK401Balance(newBalance);
+        store.set('k401Balance', newBalance);
+      };
+      
+      return React.createElement('div', { className: 'container' },
+        // Navigation
+        React.createElement('div', { className: 'nav' },
+          React.createElement('button', {
+            className: 'nav-btn' + (tab === 'networth' ? ' active' : ''),
+            onClick: () => setTab('networth')
+          }, '💰 Net Worth'),
+          React.createElement('button', {
+            className: 'nav-btn' + (tab === 'checking' ? ' active' : ''),
+            onClick: () => setTab('checking')
+          }, '🏦 Checking'),
+          React.createElement('button', {
+            className: 'nav-btn' + (tab === 'roth' ? ' active' : ''),
+            onClick: () => setTab('roth')
+          }, '📈 Roth IRA'),
+          React.createElement('button', {
+            className: 'nav-btn' + (tab === 'k401' ? ' active' : ''),
+            onClick: () => setTab('k401')
+          }, '💼 401K')
+        ),
+        
+        // Content
+        tab === 'networth' && React.createElement('div', null,
+          React.createElement('div', { className: 'card' },
+            React.createElement('h2', null, 'Total Net Worth'),
+            React.createElement('div', { className: 'balance' }, 
+              '$' + totalNetWorth.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})
+            )
+          ),
+          React.createElement('div', { className: 'account-grid' },
+            React.createElement('div', { className: 'account-card checking' },
+              React.createElement('h3', null, 'Checking Account'),
+              React.createElement('div', { className: 'amount' }, 
+                '$' + checkingBalance.toLocaleString('en-US', {minimumFractionDigits: 2})
+              )
+            ),
+            React.createElement('div', { className: 'account-card roth' },
+              React.createElement('h3', null, 'Roth IRA'),
+              React.createElement('div', { className: 'amount' }, 
+                '$' + rothBalance.toLocaleString('en-US', {minimumFractionDigits: 2})
+              )
+            ),
+            React.createElement('div', { className: 'account-card k401' },
+              React.createElement('h3', null, '401K'),
+              React.createElement('div', { className: 'amount' }, 
+                '$' + k401Balance.toLocaleString('en-US', {minimumFractionDigits: 2})
+              )
+            )
+          )
+        ),
+        
+        tab === 'checking' && React.createElement('div', null,
+          React.createElement('div', { className: 'card' },
+            React.createElement('h2', null, 'Checking Account'),
+            React.createElement('div', { className: 'balance' }, 
+              '$' + checkingBalance.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})
+            ),
+            React.createElement('button', { 
+              className: 'btn',
+              onClick: () => setShowModal(true)
+            }, '+ Add Transaction')
+          ),
+          React.createElement('div', { className: 'card' },
+            React.createElement('h2', null, 'Recent Transactions'),
+            checkingTransactions.length === 0 
+              ? React.createElement('p', { style: { color: '#999', textAlign: 'center', padding: '20px' } }, 
+                  'No transactions yet. Add your first one!')
+              : checkingTransactions.map(t => 
+                  React.createElement('div', { 
+                    key: t.id,
+                    className: 'transaction ' + t.type
+                  },
+                    React.createElement('div', null,
+                      React.createElement('strong', null, t.category),
+                      t.description && React.createElement('div', { style: { fontSize: '14px', color: '#666' } }, t.description),
+                      React.createElement('div', { style: { fontSize: '12px', color: '#999' } }, t.date)
+                    ),
+                    React.createElement('div', { className: 'transaction-amount ' + t.type },
+                      (t.type === 'income' ? '+' : '-') + '$' + t.amount.toFixed(2)
+                    )
+                  )
+                )
+          )
+        ),
+        
+        tab === 'roth' && React.createElement('div', { className: 'card' },
+          React.createElement('h2', null, 'Roth IRA'),
+          React.createElement('div', { className: 'balance' }, 
+            '$' + rothBalance.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})
+          ),
+          React.createElement('div', { className: 'form-group' },
+            React.createElement('label', null, 'Update Balance'),
+            React.createElement('input', {
+              type: 'number',
+              step: '0.01',
+              placeholder: 'Enter current Roth IRA balance',
+              defaultValue: rothBalance,
+              onBlur: (e) => updateRothBalance(e.target.value)
+            })
+          ),
+          React.createElement('p', { style: { color: '#666', marginTop: '20px' } },
+            'Enter your total Roth IRA balance including all investments.'
+          )
+        ),
+        
+        tab === 'k401' && React.createElement('div', { className: 'card' },
+          React.createElement('h2', null, '401K'),
+          React.createElement('div', { className: 'balance' }, 
+            '$' + k401Balance.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})
+          ),
+          React.createElement('div', { className: 'form-group' },
+            React.createElement('label', null, 'Update Balance'),
+            React.createElement('input', {
+              type: 'number',
+              step: '0.01',
+              placeholder: 'Enter current 401K balance',
+              defaultValue: k401Balance,
+              onBlur: (e) => update401KBalance(e.target.value)
+            })
+          ),
+          React.createElement('p', { style: { color: '#666', marginTop: '20px' } },
+            'Enter your total 401K balance including all investments.'
+          )
+        ),
+        
+        // Modal
+        showModal && React.createElement('div', { 
+          className: 'modal',
+          onClick: () => setShowModal(false)
+        },
+          React.createElement('div', { 
+            className: 'modal-content',
+            onClick: (e) => e.stopPropagation()
+          },
+            React.createElement('h2', null, 'Add Transaction'),
+            React.createElement('div', { className: 'form-group' },
+              React.createElement('label', null, 'Type'),
+              React.createElement('select', {
+                value: formData.type,
+                onChange: (e) => setFormData({...formData, type: e.target.value})
+              },
+                React.createElement('option', { value: 'expense' }, 'Expense'),
+                React.createElement('option', { value: 'income' }, 'Income')
+              )
+            ),
+            React.createElement('div', { className: 'form-group' },
+              React.createElement('label', null, 'Amount'),
+              React.createElement('input', {
+                type: 'number',
+                step: '0.01',
+                value: formData.amount,
+                onChange: (e) => setFormData({...formData, amount: e.target.value}),
+                placeholder: '0.00'
+              })
+            ),
+            React.createElement('div', { className: 'form-group' },
+              React.createElement('label', null, 'Category'),
+              React.createElement('select', {
+                value: formData.category,
+                onChange: (e) => setFormData({...formData, category: e.target.value})
+              },
+                React.createElement('option', { value: '' }, 'Select category'),
+                React.createElement('option', { value: 'Food' }, 'Food'),
+                React.createElement('option', { value: 'Transportation' }, 'Transportation'),
+                React.createElement('option', { value: 'Housing' }, 'Housing'),
+                React.createElement('option', { value: 'Entertainment' }, 'Entertainment'),
+                React.createElement('option', { value: 'Shopping' }, 'Shopping'),
+                React.createElement('option', { value: 'Other' }, 'Other')
+              )
+            ),
+            React.createElement('div', { className: 'form-group' },
+              React.createElement('label', null, 'Description (optional)'),
+              React.createElement('input', {
+                type: 'text',
+                value: formData.description,
+                onChange: (e) => setFormData({...formData, description: e.target.value}),
+                placeholder: 'e.g., Lunch at restaurant'
+              })
+            ),
+            React.createElement('div', { className: 'form-group' },
+              React.createElement('label', null, 'Date'),
+              React.createElement('input', {
+                type: 'date',
+                value: formData.date,
+                onChange: (e) => setFormData({...formData, date: e.target.value})
+              })
+            ),
+            React.createElement('button', { 
+              className: 'btn',
+              onClick: addTransaction,
+              style: { width: '100%', marginTop: '10px' }
+            }, 'Add Transaction'),
+            React.createElement('button', { 
+              className: 'btn',
+              onClick: () => setShowModal(false),
+              style: { width: '100%', marginTop: '10px', background: '#ccc' }
+            }, 'Cancel')
+          )
+        )
+      );
+    }
+    
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(React.createElement(App));
+  </script>
+</body>
+</html>
