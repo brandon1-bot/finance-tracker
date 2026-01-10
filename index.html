@@ -1,0 +1,576 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <title>Finance Tracker</title>
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/recharts@2.5.0/dist/Recharts.js"></script>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { 
+      font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh;
+    }
+    .container { max-width: 1200px; margin: 0 auto; padding: 20px; }
+    .nav { 
+      background: white; display: flex; gap: 5px; border-radius: 15px; 
+      padding: 5px; margin-bottom: 20px; box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+    }
+    .nav-btn {
+      flex: 1; padding: 15px; border: none; background: transparent;
+      cursor: pointer; border-radius: 10px; font-weight: 600;
+      transition: all 0.3s; color: #666; font-size: 14px;
+    }
+    .nav-btn.active { background: linear-gradient(135deg, #667eea, #764ba2); color: white; }
+    .card {
+      background: white; border-radius: 20px; padding: 30px;
+      box-shadow: 0 10px 40px rgba(0,0,0,0.1); margin-bottom: 20px;
+    }
+    .balance { font-size: 48px; font-weight: bold; color: #333; margin: 20px 0; }
+    .account-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 20px; margin: 20px 0; }
+    .account-card { padding: 25px; border-radius: 15px; color: white; }
+    .checking { background: linear-gradient(135deg, #667eea, #764ba2); }
+    .roth { background: linear-gradient(135deg, #f093fb, #f5576c); }
+    .k401 { background: linear-gradient(135deg, #4facfe, #00f2fe); }
+    .account-card .amount { font-size: 32px; font-weight: bold; margin-top: 10px; }
+    .btn {
+      background: linear-gradient(135deg, #667eea, #764ba2); color: white;
+      border: none; padding: 15px 30px; border-radius: 10px;
+      font-size: 16px; font-weight: 600; cursor: pointer; margin: 5px;
+    }
+    .btn:hover { transform: translateY(-2px); }
+    .btn-secondary { background: #ddd; color: #333; }
+    .btn-small { padding: 8px 16px; font-size: 14px; }
+    .form-group { margin-bottom: 15px; }
+    .form-group label { display: block; margin-bottom: 5px; font-weight: 600; }
+    .form-group input, .form-group select {
+      width: 100%; padding: 12px; border: 2px solid #e0e0e0;
+      border-radius: 8px; font-size: 16px;
+    }
+    .transaction {
+      background: #f8f9fa; padding: 15px; border-radius: 10px;
+      margin-bottom: 10px; display: flex; justify-content: space-between;
+    }
+    .transaction.income { border-left: 4px solid #4caf50; }
+    .transaction.expense { border-left: 4px solid #f44336; }
+    .amount-green { color: #4caf50; font-weight: bold; font-size: 20px; }
+    .amount-red { color: #f44336; font-weight: bold; font-size: 20px; }
+    .modal {
+      position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(0,0,0,0.5); display: flex; align-items: center;
+      justify-content: center; padding: 20px; z-index: 1000;
+    }
+    .modal-content {
+      background: white; border-radius: 20px; padding: 30px;
+      max-width: 500px; width: 100%; max-height: 90vh; overflow-y: auto;
+    }
+    table { width: 100%; border-collapse: collapse; font-size: 14px; }
+    th, td { padding: 12px 8px; text-align: left; }
+    th { border-bottom: 2px solid #ddd; }
+    td { border-bottom: 1px solid #eee; }
+    .delete-btn { color: #f44336; cursor: pointer; font-size: 12px; }
+    .delete-btn:hover { text-decoration: underline; }
+    .filter-bar { display: flex; gap: 10px; margin-bottom: 20px; flex-wrap: wrap; }
+    .chart-container { background: #f8f9fa; padding: 20px; border-radius: 15px; margin: 20px 0; }
+    .legend-item { display: flex; align-items: center; gap: 10px; padding: 10px; background: white; border-radius: 8px; margin-bottom: 8px; }
+    .legend-color { width: 16px; height: 16px; border-radius: 4px; }
+    @media (max-width: 768px) {
+      .balance { font-size: 36px; }
+      .nav-btn { padding: 10px; font-size: 12px; }
+    }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+  
+  <script>
+    const { useState, useEffect, createElement: h } = React;
+    const { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, LineChart, Line, XAxis, YAxis } = Recharts;
+    const fmt = (n) => '$' + n.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+    
+    function App() {
+      const [tab, setTab] = useState('networth');
+      const [checkBal, setCheckBal] = useState(0);
+      const [checkTx, setCheckTx] = useState([]);
+      const [rothHold, setRothHold] = useState([]);
+      const [rothBal, setRothBal] = useState(0);
+      const [k401Hold, set401Hold] = useState([]);
+      const [k401Bal, set401Bal] = useState(0);
+      const [prices, setPrices] = useState({});
+      const [showModal, setShowModal] = useState(null);
+      const [formData, setFormData] = useState({});
+      const [filterMonth, setFilterMonth] = useState('');
+      const [filterYear, setFilterYear] = useState('');
+      
+      useEffect(() => {
+        const cb = localStorage.getItem('checkBal');
+        const ct = localStorage.getItem('checkTx');
+        const rb = localStorage.getItem('rothBal');
+        const rh = localStorage.getItem('rothHold');
+        const kb = localStorage.getItem('k401Bal');
+        const kh = localStorage.getItem('k401Hold');
+        if (cb) setCheckBal(parseFloat(cb));
+        if (ct) setCheckTx(JSON.parse(ct));
+        if (rb) setRothBal(parseFloat(rb));
+        if (rh) setRothHold(JSON.parse(rh));
+        if (kb) set401Bal(parseFloat(kb));
+        if (kh) set401Hold(JSON.parse(kh));
+      }, []);
+      
+      const saveCheck = (bal, tx) => {
+        setCheckBal(bal);
+        setCheckTx(tx);
+        localStorage.setItem('checkBal', bal);
+        localStorage.setItem('checkTx', JSON.stringify(tx));
+      };
+      
+      const saveRoth = (bal, hold) => {
+        setRothBal(bal);
+        setRothHold(hold);
+        localStorage.setItem('rothBal', bal);
+        localStorage.setItem('rothHold', JSON.stringify(hold));
+      };
+      
+      const save401 = (bal, hold) => {
+        set401Bal(bal);
+        set401Hold(hold);
+        localStorage.setItem('k401Bal', bal);
+        localStorage.setItem('k401Hold', JSON.stringify(hold));
+      };
+      
+      const fetchPrices = async () => {
+        const tickers = [...new Set([...rothHold.map(h => h.ticker), ...k401Hold.map(h => h.ticker)])];
+        if (tickers.length === 0) return;
+        const p = {};
+        for (const t of tickers) {
+          try {
+            const r = await fetch(`https://query1.finance.yahoo.com/v8/finance/chart/${t}`);
+            const d = await r.json();
+            if (d.chart?.result?.[0]?.meta?.regularMarketPrice) {
+              p[t] = d.chart.result[0].meta.regularMarketPrice;
+            }
+          } catch(e) {}
+        }
+        setPrices(p);
+      };
+      
+      const calcCheck = () => {
+        const inc = checkTx.filter(t => t.type === 'income').reduce((s, t) => s + t.amount, 0);
+        const exp = checkTx.filter(t => t.type === 'expense').reduce((s, t) => s + t.amount, 0);
+        return checkBal + inc - exp;
+      };
+      
+      const calcPort = (holds) => holds.reduce((s, h) => s + h.shares * (prices[h.ticker] || h.cost), 0);
+      const rothVal = rothBal + calcPort(rothHold);
+      const k401Val = k401Bal + calcPort(k401Hold);
+      const netWorth = calcCheck() + rothVal + k401Val;
+      
+      // Filter transactions
+      const getFilteredTx = () => {
+        if (!filterMonth && !filterYear) return checkTx;
+        return checkTx.filter(t => {
+          const d = new Date(t.date);
+          const m = d.getMonth();
+          const y = d.getFullYear();
+          if (filterMonth && filterYear) return m === parseInt(filterMonth) && y === parseInt(filterYear);
+          if (filterMonth) return m === parseInt(filterMonth);
+          if (filterYear) return y === parseInt(filterYear);
+          return true;
+        });
+      };
+      
+      const filteredTx = getFilteredTx();
+      
+      // Expense breakdown
+      const getExpenseBreakdown = () => {
+        const exp = filteredTx.filter(t => t.type === 'expense');
+        const breakdown = {};
+        exp.forEach(t => {
+          breakdown[t.category] = (breakdown[t.category] || 0) + t.amount;
+        });
+        const colors = ['#6366f1', '#8b5cf6', '#ec4899', '#f59e0b', '#10b981', '#3b82f6', '#ef4444'];
+        return Object.entries(breakdown).map(([name, value], i) => ({
+          name,
+          value,
+          color: colors[i % colors.length],
+          percent: (value / exp.reduce((s, t) => s + t.amount, 0) * 100).toFixed(1)
+        })).sort((a, b) => b.value - a.value);
+      };
+      
+      const expenseData = getExpenseBreakdown();
+      
+      // Get available months/years
+      const getMonths = () => [...new Set(checkTx.map(t => new Date(t.date).getMonth()))].sort((a,b) => a-b);
+      const getYears = () => [...new Set(checkTx.map(t => new Date(t.date).getFullYear()))].sort((a,b) => b-a);
+      const monthNames = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+      
+      // Portfolio chart data
+      const getPortfolioData = () => {
+        const sorted = [...checkTx].sort((a,b) => new Date(a.date) - new Date(b.date));
+        if (sorted.length === 0) return [];
+        
+        let balance = checkBal;
+        const data = [{date: 'Start', value: checkBal}];
+        
+        sorted.forEach(t => {
+          balance += t.type === 'income' ? t.amount : -t.amount;
+          data.push({
+            date: new Date(t.date).toLocaleDateString('en-US', {month: 'short', day: 'numeric'}),
+            value: balance
+          });
+        });
+        
+        return data.slice(-30); // Last 30 data points
+      };
+      
+      const portfolioData = getPortfolioData();
+      
+      const addTx = () => {
+        if (!formData.amount || !formData.category) return alert('Fill all fields');
+        const tx = {...formData, amount: parseFloat(formData.amount), id: Date.now()};
+        saveCheck(checkBal, [tx, ...checkTx]);
+        setShowModal(null);
+        setFormData({});
+      };
+      
+      const addHold = (isRoth) => {
+        if (!formData.ticker || !formData.shares || !formData.cost) return alert('Fill all fields');
+        const h = {ticker: formData.ticker.toUpperCase(), shares: parseFloat(formData.shares), cost: parseFloat(formData.cost), id: Date.now()};
+        if (isRoth) saveRoth(rothBal, [...rothHold, h]);
+        else save401(k401Bal, [...k401Hold, h]);
+        setShowModal(null);
+        setFormData({});
+      };
+      
+      const accountData = [
+        {name: 'Checking', value: calcCheck(), color: '#6366f1'},
+        {name: 'Roth IRA', value: rothVal, color: '#8b5cf6'},
+        {name: '401K', value: k401Val, color: '#ec4899'}
+      ];
+      
+      return h('div', {className: 'container'},
+        h('div', {className: 'nav'},
+          ['💰 Net Worth', '🏦 Checking', '📈 Roth IRA', '💼 401K'].map((label, i) =>
+            h('button', {
+              key: i,
+              className: 'nav-btn' + (tab === ['networth','checking','roth','k401'][i] ? ' active' : ''),
+              onClick: () => setTab(['networth','checking','roth','k401'][i])
+            }, label)
+          )
+        ),
+        
+        tab === 'networth' && h('div', null,
+          h('div', {className: 'card'},
+            h('h2', null, 'Total Net Worth'),
+            h('div', {className: 'balance'}, fmt(netWorth)),
+            h('button', {className: 'btn', onClick: fetchPrices}, '🔄 Refresh Stock Prices')
+          ),
+          h('div', {className: 'account-grid'},
+            h('div', {className: 'account-card checking'},
+              h('div', null, 'Checking'),
+              h('div', {className: 'amount'}, fmt(calcCheck()))
+            ),
+            h('div', {className: 'account-card roth'},
+              h('div', null, 'Roth IRA'),
+              h('div', {className: 'amount'}, fmt(rothVal))
+            ),
+            h('div', {className: 'account-card k401'},
+              h('div', null, '401K'),
+              h('div', {className: 'amount'}, fmt(k401Val))
+            )
+          ),
+          h('div', {className: 'card'},
+            h('h3', {style: {marginBottom: '20px'}}, 'Asset Allocation'),
+            h('div', {style: {display: 'flex', gap: '40px', alignItems: 'center', flexWrap: 'wrap'}},
+              h('div', {style: {flex: '1', minWidth: '300px', height: '300px'}},
+                h(ResponsiveContainer, {width: '100%', height: '100%'},
+                  h(PieChart, null,
+                    h(Pie, {
+                      data: accountData,
+                      dataKey: 'value',
+                      nameKey: 'name',
+                      cx: '50%',
+                      cy: '50%',
+                      outerRadius: 100,
+                      label: d => `${d.name} ${(d.value/netWorth*100).toFixed(0)}%`
+                    }, accountData.map((e, i) => h(Cell, {key: i, fill: e.color}))),
+                    h(Tooltip, {formatter: v => fmt(v)})
+                  )
+                )
+              ),
+              h('div', {style: {flex: '1', minWidth: '250px'}},
+                accountData.map(a => h('div', {key: a.name, className: 'legend-item'},
+                  h('div', {className: 'legend-color', style: {backgroundColor: a.color}}),
+                  h('div', {style: {flex: 1}},
+                    h('div', {style: {fontWeight: '600'}}, a.name),
+                    h('div', {style: {fontSize: '14px', color: '#666'}}, 
+                      fmt(a.value) + ' (' + (a.value/netWorth*100).toFixed(1) + '%)'
+                    )
+                  )
+                ))
+              )
+            )
+          )
+        ),
+        
+        tab === 'checking' && h('div', null,
+          h('div', {className: 'card'},
+            h('h2', null, 'Checking Account'),
+            h('div', {className: 'balance'}, fmt(calcCheck())),
+            h('div', null,
+              h('button', {className: 'btn', onClick: () => setShowModal('checkBal')}, 'Set Balance'),
+              h('button', {className: 'btn', onClick: () => setShowModal('addTx')}, '+ Add Transaction')
+            ),
+            h('p', {style: {marginTop: '20px'}}, 'Starting: ' + fmt(checkBal) + ' | Transactions: ' + checkTx.length)
+          ),
+          
+          portfolioData.length > 1 && h('div', {className: 'card'},
+            h('h3', {style: {marginBottom: '20px'}}, 'Balance Over Time'),
+            h('div', {style: {height: '300px'}},
+              h(ResponsiveContainer, {width: '100%', height: '100%'},
+                h(LineChart, {data: portfolioData},
+                  h(XAxis, {dataKey: 'date', tick: {fontSize: 12}}),
+                  h(YAxis, {tick: {fontSize: 12}}),
+                  h(Tooltip, {formatter: v => fmt(v)}),
+                  h(Line, {type: 'monotone', dataKey: 'value', stroke: '#6366f1', strokeWidth: 3, dot: false})
+                )
+              )
+            )
+          ),
+          
+          expenseData.length > 0 && h('div', {className: 'card'},
+            h('h3', {style: {marginBottom: '20px'}}, 
+              'Expense Breakdown' + (filterMonth || filterYear ? ' (' + 
+              (filterMonth ? monthNames[filterMonth] : 'All months') + ' ' + 
+              (filterYear || '') + ')' : '')
+            ),
+            h('div', {style: {display: 'flex', gap: '40px', alignItems: 'center', flexWrap: 'wrap'}},
+              h('div', {style: {flex: '1', minWidth: '300px', height: '300px'}},
+                h(ResponsiveContainer, {width: '100%', height: '100%'},
+                  h(PieChart, null,
+                    h(Pie, {
+                      data: expenseData,
+                      dataKey: 'value',
+                      nameKey: 'name',
+                      cx: '50%',
+                      cy: '50%',
+                      outerRadius: 100,
+                      label: d => `${d.name} ${d.percent}%`
+                    }, expenseData.map((e, i) => h(Cell, {key: i, fill: e.color}))),
+                    h(Tooltip, {formatter: v => fmt(v)})
+                  )
+                )
+              ),
+              h('div', {style: {flex: '1', minWidth: '250px'}},
+                expenseData.map(e => h('div', {key: e.name, className: 'legend-item'},
+                  h('div', {className: 'legend-color', style: {backgroundColor: e.color}}),
+                  h('div', {style: {flex: 1}},
+                    h('div', {style: {fontWeight: '600'}}, e.name),
+                    h('div', {style: {fontSize: '14px', color: '#666'}}, fmt(e.value) + ' (' + e.percent + '%)')
+                  )
+                ))
+              )
+            )
+          ),
+          
+          h('div', {className: 'card'},
+            h('div', {style: {display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', flexWrap: 'wrap', gap: '10px'}},
+              h('h3', null, 'Transactions'),
+              h('div', {className: 'filter-bar'},
+                h('select', {
+                  className: 'btn-small',
+                  value: filterMonth,
+                  onChange: e => setFilterMonth(e.target.value),
+                  style: {padding: '8px'}
+                },
+                  h('option', {value: ''}, 'All Months'),
+                  getMonths().map(m => h('option', {key: m, value: m}, monthNames[m]))
+                ),
+                h('select', {
+                  className: 'btn-small',
+                  value: filterYear,
+                  onChange: e => setFilterYear(e.target.value),
+                  style: {padding: '8px'}
+                },
+                  h('option', {value: ''}, 'All Years'),
+                  getYears().map(y => h('option', {key: y, value: y}, y))
+                ),
+                (filterMonth || filterYear) && h('button', {
+                  className: 'btn-small btn-secondary',
+                  onClick: () => {setFilterMonth(''); setFilterYear('');}
+                }, 'Clear')
+              )
+            ),
+            filteredTx.length === 0 ? h('p', {style: {color: '#999', textAlign: 'center', padding: '20px'}}, 
+              checkTx.length === 0 ? 'No transactions yet' : 'No transactions for selected filters'
+            ) :
+            filteredTx.map(t => h('div', {key: t.id, className: 'transaction ' + t.type},
+              h('div', null,
+                h('strong', null, t.category),
+                t.description && h('div', {style: {fontSize: '14px', color: '#666'}}, t.description),
+                h('div', {style: {fontSize: '12px', color: '#999'}}, t.date)
+              ),
+              h('div', null,
+                h('div', {className: t.type === 'income' ? 'amount-green' : 'amount-red'}, 
+                  (t.type === 'income' ? '+' : '-') + fmt(t.amount)
+                ),
+                h('span', {className: 'delete-btn', onClick: () => saveCheck(checkBal, checkTx.filter(x => x.id !== t.id))}, 'Delete')
+              )
+            ))
+          )
+        ),
+        
+        tab === 'roth' && h('div', {className: 'card'},
+          h('h2', null, 'Roth IRA'),
+          h('div', {className: 'balance'}, fmt(rothVal)),
+          h('div', null,
+            h('button', {className: 'btn', onClick: () => setShowModal('rothBal')}, 'Set Cash'),
+            h('button', {className: 'btn', onClick: () => setShowModal('rothHold')}, '+ Add Holding'),
+            h('button', {className: 'btn', onClick: fetchPrices}, '🔄 Refresh')
+          ),
+          h('p', {style: {marginTop: '20px'}}, 'Cash: ' + fmt(rothBal) + ' | Holdings: ' + rothHold.length),
+          rothHold.length > 0 && h('table', {style: {marginTop: '20px'}},
+            h('thead', null, h('tr', null,
+              h('th', null, 'Ticker'), h('th', null, 'Shares'), h('th', null, 'Cost'), 
+              h('th', null, 'Price'), h('th', null, 'Value'), h('th', null, 'Gain/Loss'), h('th', null, '')
+            )),
+            h('tbody', null, rothHold.map(hold => {
+              const price = prices[hold.ticker] || hold.cost;
+              const val = hold.shares * price;
+              const gain = val - (hold.shares * hold.cost);
+              const pct = (gain / (hold.shares * hold.cost)) * 100;
+              return h('tr', {key: hold.id},
+                h('td', null, h('strong', null, hold.ticker)),
+                h('td', null, hold.shares.toFixed(3)),
+                h('td', null, fmt(hold.cost)),
+                h('td', null, fmt(price)),
+                h('td', null, h('strong', null, fmt(val))),
+                h('td', {style: {color: gain >= 0 ? '#4caf50' : '#f44336'}}, 
+                  (gain >= 0 ? '+' : '') + fmt(gain) + ' (' + pct.toFixed(1) + '%)'
+                ),
+                h('td', null, h('span', {className: 'delete-btn', onClick: () => saveRoth(rothBal, rothHold.filter(x => x.id !== hold.id))}, 'Del'))
+              );
+            }))
+          )
+        ),
+        
+        tab === 'k401' && h('div', {className: 'card'},
+          h('h2', null, '401K'),
+          h('div', {className: 'balance'}, fmt(k401Val)),
+          h('div', null,
+            h('button', {className: 'btn', onClick: () => setShowModal('k401Bal')}, 'Set Cash'),
+            h('button', {className: 'btn', onClick: () => setShowModal('k401Hold')}, '+ Add Holding'),
+            h('button', {className: 'btn', onClick: fetchPrices}, '🔄 Refresh')
+          ),
+          h('p', {style: {marginTop: '20px'}}, 'Cash: ' + fmt(k401Bal) + ' | Holdings: ' + k401Hold.length),
+          k401Hold.length > 0 && h('table', {style: {marginTop: '20px'}},
+            h('thead', null, h('tr', null,
+              h('th', null, 'Ticker'), h('th', null, 'Shares'), h('th', null, 'Cost'), 
+              h('th', null, 'Price'), h('th', null, 'Value'), h('th', null, 'Gain/Loss'), h('th', null, '')
+            )),
+            h('tbody', null, k401Hold.map(hold => {
+              const price = prices[hold.ticker] || hold.cost;
+              const val = hold.shares * price;
+              const gain = val - (hold.shares * hold.cost);
+              const pct = (gain / (hold.shares * hold.cost)) * 100;
+              return h('tr', {key: hold.id},
+                h('td', null, h('strong', null, hold.ticker)),
+                h('td', null, hold.shares.toFixed(3)),
+                h('td', null, fmt(hold.cost)),
+                h('td', null, fmt(price)),
+                h('td', null, h('strong', null, fmt(val))),
+                h('td', {style: {color: gain >= 0 ? '#4caf50' : '#f44336'}}, 
+                  (gain >= 0 ? '+' : '') + fmt(gain) + ' (' + pct.toFixed(1) + '%)'
+                ),
+                h('td', null, h('span', {className: 'delete-btn', onClick: () => save401(k401Bal, k401Hold.filter(x => x.id !== hold.id))}, 'Del'))
+              );
+            }))
+          )
+        ),
+        
+        showModal && h('div', {className: 'modal', onClick: () => setShowModal(null)},
+          h('div', {className: 'modal-content', onClick: e => e.stopPropagation()},
+            showModal === 'checkBal' && h('div', null,
+              h('h2', null, 'Set Starting Balance'),
+              h('div', {className: 'form-group'},
+                h('label', null, 'Amount'),
+                h('input', {type: 'number', step: '0.01', placeholder: '0.00', onBlur: e => saveCheck(parseFloat(e.target.value) || 0, checkTx)})
+              ),
+              h('button', {className: 'btn', onClick: () => setShowModal(null)}, 'Done')
+            ),
+            
+            showModal === 'addTx' && h('div', null,
+              h('h2', null, 'Add Transaction'),
+              h('div', {className: 'form-group'},
+                h('label', null, 'Type'),
+                h('select', {onChange: e => setFormData({...formData, type: e.target.value})},
+                  h('option', {value: 'expense'}, 'Expense'),
+                  h('option', {value: 'income'}, 'Income')
+                )
+              ),
+              h('div', {className: 'form-group'},
+                h('label', null, 'Amount'),
+                h('input', {type: 'number', step: '0.01', placeholder: '0.00', onChange: e => setFormData({...formData, amount: e.target.value})})
+              ),
+              h('div', {className: 'form-group'},
+                h('label', null, 'Category'),
+                h('select', {onChange: e => setFormData({...formData, category: e.target.value})},
+                  h('option', {value: ''}, 'Select...'),
+                  ['Food','Transportation','Housing','Entertainment','Shopping','Other'].map(c => h('option', {key: c, value: c}, c))
+                )
+              ),
+              h('div', {className: 'form-group'},
+                h('label', null, 'Description'),
+                h('input', {type: 'text', onChange: e => setFormData({...formData, description: e.target.value})})
+              ),
+              h('div', {className: 'form-group'},
+                h('label', null, 'Date'),
+                h('input', {type: 'date', defaultValue: new Date().toISOString().split('T')[0], onChange: e => setFormData({...formData, date: e.target.value})})
+              ),
+              h('button', {className: 'btn', onClick: addTx}, 'Add'),
+              h('button', {className: 'btn btn-secondary', onClick: () => setShowModal(null)}, 'Cancel')
+            ),
+            
+            (showModal === 'rothBal' || showModal === 'k401Bal') && h('div', null,
+              h('h2', null, 'Set Cash Balance'),
+              h('div', {className: 'form-group'},
+                h('label', null, 'Amount'),
+                h('input', {type: 'number', step: '0.01', placeholder: '0.00', onBlur: e => {
+                  if (showModal === 'rothBal') saveRoth(parseFloat(e.target.value) || 0, rothHold);
+                  else save401(parseFloat(e.target.value) || 0, k401Hold);
+                }})
+              ),
+              h('button', {className: 'btn', onClick: () => setShowModal(null)}, 'Done')
+            ),
+            
+            (showModal === 'rothHold' || showModal === 'k401Hold') && h('div', null,
+              h('h2', null, 'Add Holding'),
+              h('div', {className: 'form-group'},
+                h('label', null, 'Ticker'),
+                h('input', {type: 'text', placeholder: 'VTI', onChange: e => setFormData({...formData, ticker: e.target.value})})
+              ),
+              h('div', {className: 'form-group'},
+                h('label', null, 'Shares'),
+                h('input', {type: 'number', step: '0.001', placeholder: '10', onChange: e => setFormData({...formData, shares: e.target.value})})
+              ),
+              h('div', {className: 'form-group'},
+                h('label', null, 'Cost Basis'),
+                h('input', {type: 'number', step: '0.01', placeholder: '250.00', onChange: e => setFormData({...formData, cost: e.target.value})})
+              ),
+              h('button', {className: 'btn', onClick: () => addHold(showModal === 'rothHold')}, 'Add'),
+              h('button', {className: 'btn btn-secondary', onClick: () => setShowModal(null)}, 'Cancel')
+            )
+          )
+        )
+      );
+    }
+    
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(React.createElement(App));
+  </script>
+</body>
+</html>
