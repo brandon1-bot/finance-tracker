@@ -1,0 +1,1246 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Net Worth Tracker</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh;
+      padding: 20px;
+    }
+
+    .container {
+      max-width: 1400px;
+      margin: 0 auto;
+      background: white;
+      border-radius: 20px;
+      padding: 30px;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+    }
+
+    h1 {
+      color: #667eea;
+      margin-bottom: 10px;
+      font-size: 2.2em;
+    }
+
+    .subtitle {
+      color: #666;
+      margin-bottom: 30px;
+      font-size: 0.95em;
+    }
+
+    .total-section {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      padding: 30px;
+      border-radius: 15px;
+      margin-bottom: 30px;
+      text-align: center;
+    }
+
+    .total-label {
+      font-size: 0.9em;
+      opacity: 0.9;
+      margin-bottom: 5px;
+    }
+
+    .total-amount {
+      font-size: 3em;
+      font-weight: bold;
+      margin-bottom: 15px;
+    }
+
+    .chart-container {
+      background: white;
+      padding: 20px;
+      border-radius: 15px;
+      margin-bottom: 30px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    }
+
+    .chart-container h2 {
+      color: #333;
+      margin-bottom: 20px;
+      font-size: 1.3em;
+    }
+
+    .charts-grid {
+      display: grid;
+      grid-template-columns: 2fr 1fr;
+      gap: 20px;
+      margin-bottom: 30px;
+    }
+
+    .tabs {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 30px;
+      border-bottom: 2px solid #e0e0e0;
+    }
+
+    .tab {
+      padding: 15px 30px;
+      background: none;
+      border: none;
+      border-bottom: 3px solid transparent;
+      cursor: pointer;
+      font-size: 1em;
+      font-weight: 600;
+      color: #666;
+      transition: all 0.3s;
+    }
+
+    .tab.active {
+      color: #667eea;
+      border-bottom-color: #667eea;
+    }
+
+    .tab:hover {
+      color: #667eea;
+    }
+
+    .tab-content {
+      display: none;
+    }
+
+    .tab-content.active {
+      display: block;
+    }
+
+    .account-card {
+      background: #f8f9fa;
+      padding: 25px;
+      border-radius: 12px;
+      margin-bottom: 20px;
+    }
+
+    .account-card h3 {
+      color: #333;
+      margin-bottom: 20px;
+      font-size: 1.3em;
+    }
+
+    .form-group {
+      margin-bottom: 20px;
+    }
+
+    .form-row {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 15px;
+      margin-bottom: 15px;
+    }
+
+    label {
+      display: block;
+      margin-bottom: 5px;
+      color: #555;
+      font-size: 0.9em;
+      font-weight: 500;
+    }
+
+    input, select {
+      width: 100%;
+      padding: 12px;
+      border: 2px solid #e0e0e0;
+      border-radius: 8px;
+      font-size: 1em;
+      transition: border-color 0.3s;
+    }
+
+    input:focus, select:focus {
+      outline: none;
+      border-color: #667eea;
+    }
+
+    button {
+      padding: 12px 24px;
+      border: none;
+      border-radius: 8px;
+      font-size: 1em;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.3s;
+    }
+
+    .btn-primary {
+      background: #667eea;
+      color: white;
+    }
+
+    .btn-primary:hover {
+      background: #5568d3;
+      transform: translateY(-2px);
+      box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+    }
+
+    .btn-danger {
+      background: #e74c3c;
+      color: white;
+    }
+
+    .btn-danger:hover {
+      background: #c0392b;
+    }
+
+    .btn-success {
+      background: #27ae60;
+      color: white;
+    }
+
+    .btn-success:hover {
+      background: #229954;
+    }
+
+    .btn-warning {
+      background: #f39c12;
+      color: white;
+    }
+
+    .btn-warning:hover {
+      background: #e67e22;
+    }
+
+    .transaction-list, .holding-list {
+      margin-top: 20px;
+      max-height: 400px;
+      overflow-y: auto;
+    }
+
+    .transaction-item, .holding-item {
+      background: white;
+      padding: 15px;
+      border-radius: 8px;
+      margin-bottom: 10px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-left: 4px solid #667eea;
+    }
+
+    .transaction-income {
+      border-left-color: #27ae60;
+    }
+
+    .transaction-expense {
+      border-left-color: #e74c3c;
+    }
+
+    .transaction-details {
+      flex: 1;
+    }
+
+    .transaction-type {
+      font-weight: bold;
+      margin-bottom: 5px;
+    }
+
+    .transaction-description {
+      color: #666;
+      font-size: 0.9em;
+    }
+
+    .transaction-date {
+      color: #999;
+      font-size: 0.85em;
+    }
+
+    .transaction-amount {
+      font-size: 1.2em;
+      font-weight: bold;
+    }
+
+    .amount-positive {
+      color: #27ae60;
+    }
+
+    .amount-negative {
+      color: #e74c3c;
+    }
+
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 15px;
+      margin-bottom: 20px;
+    }
+
+    .stat-card {
+      background: white;
+      padding: 20px;
+      border-radius: 10px;
+      text-align: center;
+    }
+
+    .stat-label {
+      color: #666;
+      font-size: 0.85em;
+      margin-bottom: 5px;
+    }
+
+    .stat-value {
+      font-size: 1.5em;
+      font-weight: bold;
+      color: #667eea;
+    }
+
+    .delete-btn {
+      background: #e74c3c;
+      color: white;
+      border: none;
+      padding: 8px 12px;
+      border-radius: 5px;
+      cursor: pointer;
+      font-size: 0.85em;
+      margin-left: 10px;
+    }
+
+    .delete-btn:hover {
+      background: #c0392b;
+    }
+
+    .holding-info {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 10px;
+      font-size: 0.9em;
+    }
+
+    .holding-label {
+      color: #666;
+    }
+
+    .holding-value {
+      font-weight: bold;
+      color: #333;
+    }
+
+    .filter-section {
+      background: white;
+      padding: 15px;
+      border-radius: 10px;
+      margin-bottom: 20px;
+      display: flex;
+      gap: 15px;
+      align-items: flex-end;
+    }
+
+    .filter-group {
+      flex: 1;
+    }
+
+    datalist {
+      display: none;
+    }
+
+    .custom-option {
+      cursor: pointer;
+      padding: 8px;
+      background: white;
+    }
+
+    .custom-option:hover {
+      background: #f0f0f0;
+    }
+
+    .loading {
+      opacity: 0.6;
+      pointer-events: none;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>💰 Net Worth Tracker</h1>
+    <p class="subtitle">Track your finances across all accounts</p>
+
+    <div class="total-section">
+      <div class="total-label">Total Net Worth</div>
+      <div class="total-amount" id="totalNetWorth">$0.00</div>
+    </div>
+
+    <div class="charts-grid">
+      <div class="chart-container">
+        <h2>📈 Net Worth History</h2>
+        <canvas id="networthChart"></canvas>
+      </div>
+      <div class="chart-container">
+        <h2>🥧 Portfolio Breakdown</h2>
+        <canvas id="breakdownChart"></canvas>
+      </div>
+    </div>
+
+    <div class="tabs">
+      <button class="tab active" onclick="switchTab('checking')">💳 Checking</button>
+      <button class="tab" onclick="switchTab('rothira')">📈 Roth IRA</button>
+      <button class="tab" onclick="switchTab('401k')">🏦 401k</button>
+    </div>
+
+    <div id="checking-tab" class="tab-content active">
+      <div class="account-card">
+        <h3>💳 Checking Account</h3>
+
+        <div class="form-group">
+          <h4 style="margin-bottom: 15px;">Starting Balance</h4>
+          <div class="form-row">
+            <div>
+              <label>Initial Balance</label>
+              <input type="number" id="startingBalance" placeholder="0.00" step="0.01">
+            </div>
+            <div style="display: flex; align-items: flex-end;">
+              <button class="btn-warning" onclick="setStartingBalance()">Set Starting Balance</button>
+            </div>
+          </div>
+        </div>
+        
+        <div class="stats-grid">
+          <div class="stat-card">
+            <div class="stat-label">Balance</div>
+            <div class="stat-value" id="checkingBalance">$0.00</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">Total Income</div>
+            <div class="stat-value amount-positive" id="totalIncome">$0.00</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">Total Expenses</div>
+            <div class="stat-value amount-negative" id="totalExpenses">$0.00</div>
+          </div>
+        </div>
+
+        <div class="filter-section">
+          <div class="filter-group">
+            <label>Filter by Period</label>
+            <select id="periodFilter" onchange="filterTransactions()">
+              <option value="all">All Time</option>
+              <option value="thisMonth">This Month</option>
+              <option value="lastMonth">Last Month</option>
+              <option value="thisYear">This Year</option>
+              <option value="lastYear">Last Year</option>
+            </select>
+          </div>
+          <div class="filter-group">
+            <label>Custom Month</label>
+            <input type="month" id="customMonth" onchange="filterTransactions()">
+          </div>
+        </div>
+
+        <div class="chart-container">
+          <h2>Income vs Expenses</h2>
+          <canvas id="incomeExpenseChart"></canvas>
+        </div>
+
+        <div class="form-group">
+          <h4 style="margin-bottom: 15px;">Add Transaction</h4>
+          <div class="form-row">
+            <div>
+              <label>Type</label>
+              <select id="transactionType">
+                <option value="income">Income</option>
+                <option value="expense">Expense</option>
+              </select>
+            </div>
+            <div>
+              <label>Amount</label>
+              <input type="number" id="transactionAmount" placeholder="0.00" step="0.01" min="0">
+            </div>
+            <div>
+              <label>Description</label>
+              <input type="text" id="transactionDescription" placeholder="Select or type..." list="descriptionOptions" autocomplete="off">
+              <datalist id="descriptionOptions"></datalist>
+            </div>
+          </div>
+          <button class="btn-primary" onclick="addTransaction()">Add Transaction</button>
+        </div>
+
+        <div class="transaction-list" id="transactionList"></div>
+      </div>
+    </div>
+
+    <div id="rothira-tab" class="tab-content">
+      <div class="account-card">
+        <h3>📈 Roth IRA</h3>
+        
+        <div class="stats-grid">
+          <div class="stat-card">
+            <div class="stat-label">Portfolio Value</div>
+            <div class="stat-value" id="rothValue">$0.00</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">Total Contributions</div>
+            <div class="stat-value" id="rothContributions">$0.00</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">Total Gain/Loss</div>
+            <div class="stat-value" id="rothGainLoss">$0.00</div>
+          </div>
+        </div>
+
+        <div style="margin-bottom: 20px;">
+          <button class="btn-warning" onclick="updateAllPrices('roth')">🔄 Update All Stock Prices</button>
+        </div>
+
+        <div class="form-group">
+          <h4 style="margin-bottom: 15px;">Add Contribution</h4>
+          <div class="form-row">
+            <div>
+              <label>Amount</label>
+              <input type="number" id="rothContribution" placeholder="0.00" step="0.01" min="0">
+            </div>
+          </div>
+          <button class="btn-success" onclick="addRothContribution()">Add Contribution</button>
+        </div>
+
+        <div class="form-group">
+          <h4 style="margin-bottom: 15px;">Add/Update Holding</h4>
+          <div class="form-row">
+            <div>
+              <label>Ticker Symbol</label>
+              <input type="text" id="rothTicker" placeholder="e.g., VOO, VTI">
+            </div>
+            <div>
+              <label>Shares</label>
+              <input type="number" id="rothShares" placeholder="0" step="0.0001" min="0">
+            </div>
+            <div>
+              <label>Current Price (optional - will fetch live)</label>
+              <input type="number" id="rothPrice" placeholder="Will auto-fetch" step="0.01" min="0">
+            </div>
+          </div>
+          <button class="btn-primary" onclick="addRothHolding()">Add/Update Holding</button>
+        </div>
+
+        <div class="holding-list" id="rothHoldingList"></div>
+      </div>
+    </div>
+
+    <div id="401k-tab" class="tab-content">
+      <div class="account-card">
+        <h3>🏦 401k Account</h3>
+        
+        <div class="stats-grid">
+          <div class="stat-card">
+            <div class="stat-label">Portfolio Value</div>
+            <div class="stat-value" id="k401Value">$0.00</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">Total Contributions</div>
+            <div class="stat-value" id="k401Contributions">$0.00</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">Total Gain/Loss</div>
+            <div class="stat-value" id="k401GainLoss">$0.00</div>
+          </div>
+        </div>
+
+        <div style="margin-bottom: 20px;">
+          <button class="btn-warning" onclick="updateAllPrices('401k')">🔄 Update All Stock Prices</button>
+        </div>
+
+        <div class="form-group">
+          <h4 style="margin-bottom: 15px;">Add Contribution</h4>
+          <div class="form-row">
+            <div>
+              <label>Amount</label>
+              <input type="number" id="k401Contribution" placeholder="0.00" step="0.01" min="0">
+            </div>
+          </div>
+          <button class="btn-success" onclick="add401kContribution()">Add Contribution</button>
+        </div>
+
+        <div class="form-group">
+          <h4 style="margin-bottom: 15px;">Add/Update Holding</h4>
+          <div class="form-row">
+            <div>
+              <label>Ticker Symbol</label>
+              <input type="text" id="k401Ticker" placeholder="e.g., VOO, VTI">
+            </div>
+            <div>
+              <label>Shares</label>
+              <input type="number" id="k401Shares" placeholder="0" step="0.0001" min="0">
+            </div>
+            <div>
+              <label>Current Price (optional - will fetch live)</label>
+              <input type="number" id="k401Price" placeholder="Will auto-fetch" step="0.01" min="0">
+            </div>
+          </div>
+          <button class="btn-primary" onclick="add401kHolding()">Add/Update Holding</button>
+        </div>
+
+        <div class="holding-list" id="k401HoldingList"></div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let data = {
+      checking: {
+        startingBalance: 0,
+        transactions: []
+      },
+      rothIRA: {
+        holdings: [],
+        contributions: 0
+      },
+      k401: {
+        holdings: [],
+        contributions: 0
+      },
+      history: [],
+      commonDescriptions: [
+        'Salary',
+        'Paycheck',
+        'Bonus',
+        'Freelance',
+        'Investment Income',
+        'Groceries',
+        'Rent',
+        'Utilities',
+        'Gas',
+        'Restaurant',
+        'Shopping',
+        'Entertainment',
+        'Healthcare',
+        'Insurance',
+        'Transportation',
+        'Subscription'
+      ]
+    };
+
+    let networthChart, breakdownChart, incomeExpenseChart;
+    let filteredPeriod = 'all';
+
+    loadData();
+    initCharts();
+    updateDescriptionList();
+    updateAll();
+
+    function switchTab(tab) {
+      document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+      document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+      
+      event.target.classList.add('active');
+      document.getElementById(tab + '-tab').classList.add('active');
+    }
+
+    function setStartingBalance() {
+      const balance = parseFloat(document.getElementById('startingBalance').value);
+      if (isNaN(balance)) {
+        alert('Please enter a valid starting balance');
+        return;
+      }
+
+      if (data.checking.transactions.length > 0) {
+        if (!confirm('Setting a starting balance will affect your current balance. Continue?')) {
+          return;
+        }
+      }
+
+      data.checking.startingBalance = balance;
+      document.getElementById('startingBalance').value = '';
+      saveData();
+      updateAll();
+      alert('Starting balance set successfully!');
+    }
+
+    function updateDescriptionList() {
+      const datalist = document.getElementById('descriptionOptions');
+      datalist.innerHTML = data.commonDescriptions.map(desc => 
+        `<option value="${desc}">`
+      ).join('');
+    }
+
+    function addTransaction() {
+      const type = document.getElementById('transactionType').value;
+      const amount = parseFloat(document.getElementById('transactionAmount').value);
+      let description = document.getElementById('transactionDescription').value.trim();
+
+      if (!amount || amount <= 0) {
+        alert('Please enter a valid amount');
+        return;
+      }
+
+      if (!description) {
+        alert('Please enter a description');
+        return;
+      }
+
+      // Add to common descriptions if not already there
+      if (!data.commonDescriptions.includes(description)) {
+        data.commonDescriptions.push(description);
+        updateDescriptionList();
+      }
+
+      data.checking.transactions.push({
+        type,
+        amount,
+        description,
+        date: new Date().toISOString()
+      });
+
+      document.getElementById('transactionAmount').value = '';
+      document.getElementById('transactionDescription').value = '';
+
+      saveData();
+      updateAll();
+    }
+
+    function deleteTransaction(index) {
+      if (confirm('Delete this transaction?')) {
+        data.checking.transactions.splice(index, 1);
+        saveData();
+        updateAll();
+      }
+    }
+
+    function filterTransactions() {
+      const periodSelect = document.getElementById('periodFilter');
+      const customMonth = document.getElementById('customMonth').value;
+
+      if (customMonth) {
+        periodSelect.value = 'all';
+        filteredPeriod = 'custom';
+      } else {
+        filteredPeriod = periodSelect.value;
+      }
+
+      updateAll();
+    }
+
+    function getFilteredTransactions() {
+      const now = new Date();
+      const customMonth = document.getElementById('customMonth').value;
+
+      return data.checking.transactions.filter(t => {
+        const tDate = new Date(t.date);
+
+        if (filteredPeriod === 'custom' && customMonth) {
+          const [year, month] = customMonth.split('-');
+          return tDate.getFullYear() === parseInt(year) && 
+                 tDate.getMonth() === parseInt(month) - 1;
+        }
+
+        if (filteredPeriod === 'thisMonth') {
+          return tDate.getMonth() === now.getMonth() && 
+                 tDate.getFullYear() === now.getFullYear();
+        }
+
+        if (filteredPeriod === 'lastMonth') {
+          const lastMonth = new Date(now.getFullYear(), now.getMonth() - 1);
+          return tDate.getMonth() === lastMonth.getMonth() && 
+                 tDate.getFullYear() === lastMonth.getFullYear();
+        }
+
+        if (filteredPeriod === 'thisYear') {
+          return tDate.getFullYear() === now.getFullYear();
+        }
+
+        if (filteredPeriod === 'lastYear') {
+          return tDate.getFullYear() === now.getFullYear() - 1;
+        }
+
+        return true; // all
+      });
+    }
+
+    function addRothContribution() {
+      const amount = parseFloat(document.getElementById('rothContribution').value);
+      if (!amount || amount <= 0) {
+        alert('Please enter a valid amount');
+        return;
+      }
+
+      data.rothIRA.contributions += amount;
+      document.getElementById('rothContribution').value = '';
+      saveData();
+      updateAll();
+    }
+
+    async function fetchStockPrice(ticker) {
+      try {
+        // Using a free API - Yahoo Finance alternative
+        const response = await fetch(`https://query1.finance.yahoo.com/v8/finance/chart/${ticker}`);
+        const data = await response.json();
+        
+        if (data.chart && data.chart.result && data.chart.result[0]) {
+          const price = data.chart.result[0].meta.regularMarketPrice;
+          return price;
+        }
+        return null;
+      } catch (error) {
+        console.error('Error fetching price for', ticker, error);
+        return null;
+      }
+    }
+
+    async function addRothHolding() {
+      const ticker = document.getElementById('rothTicker').value.toUpperCase().trim();
+      const shares = parseFloat(document.getElementById('rothShares').value);
+      let price = parseFloat(document.getElementById('rothPrice').value);
+
+      if (!ticker || !shares || shares <= 0) {
+        alert('Please enter a valid ticker and shares');
+        return;
+      }
+
+      // Fetch price if not provided
+      if (!price || price <= 0) {
+        const btn = event.target;
+        btn.textContent = 'Fetching price...';
+        btn.disabled = true;
+
+        price = await fetchStockPrice(ticker);
+        
+        btn.textContent = 'Add/Update Holding';
+        btn.disabled = false;
+
+        if (!price) {
+          alert('Could not fetch stock price. Please enter manually.');
+          return;
+        }
+      }
+
+      const existingIndex = data.rothIRA.holdings.findIndex(h => h.ticker === ticker);
+      if (existingIndex >= 0) {
+        data.rothIRA.holdings[existingIndex] = { ticker, shares, price };
+      } else {
+        data.rothIRA.holdings.push({ ticker, shares, price });
+      }
+
+      document.getElementById('rothTicker').value = '';
+      document.getElementById('rothShares').value = '';
+      document.getElementById('rothPrice').value = '';
+
+      saveData();
+      updateAll();
+    }
+
+    function deleteRothHolding(index) {
+      if (confirm('Delete this holding?')) {
+        data.rothIRA.holdings.splice(index, 1);
+        saveData();
+        updateAll();
+      }
+    }
+
+    async function updateAllPrices(account) {
+      const holdings = account === 'roth' ? data.rothIRA.holdings : data.k401.holdings;
+      
+      if (holdings.length === 0) {
+        alert('No holdings to update');
+        return;
+      }
+
+      const btn = event.target;
+      btn.textContent = 'Updating prices...';
+      btn.disabled = true;
+
+      let updated = 0;
+      for (let holding of holdings) {
+        const price = await fetchStockPrice(holding.ticker);
+        if (price) {
+          holding.price = price;
+          updated++;
+        }
+      }
+
+      btn.textContent = '🔄 Update All Stock Prices';
+      btn.disabled = false;
+
+      saveData();
+      updateAll();
+      alert(`Updated ${updated} of ${holdings.length} stock prices`);
+    }
+
+    function add401kContribution() {
+      const amount = parseFloat(document.getElementById('k401Contribution').value);
+      if (!amount || amount <= 0) {
+        alert('Please enter a valid amount');
+        return;
+      }
+
+      data.k401.contributions += amount;
+      document.getElementById('k401Contribution').value = '';
+      saveData();
+      updateAll();
+    }
+
+    async function add401kHolding() {
+      const ticker = document.getElementById('k401Ticker').value.toUpperCase().trim();
+      const shares = parseFloat(document.getElementById('k401Shares').value);
+      let price = parseFloat(document.getElementById('k401Price').value);
+
+      if (!ticker || !shares || shares <= 0) {
+        alert('Please enter a valid ticker and shares');
+        return;
+      }
+
+      // Fetch price if not provided
+      if (!price || price <= 0) {
+        const btn = event.target;
+        btn.textContent = 'Fetching price...';
+        btn.disabled = true;
+
+        price = await fetchStockPrice(ticker);
+        
+        btn.textContent = 'Add/Update Holding';
+        btn.disabled = false;
+
+        if (!price) {
+          alert('Could not fetch stock price. Please enter manually.');
+          return;
+        }
+      }
+
+      const existingIndex = data.k401.holdings.findIndex(h => h.ticker === ticker);
+      if (existingIndex >= 0) {
+        data.k401.holdings[existingIndex] = { ticker, shares, price };
+      } else {
+        data.k401.holdings.push({ ticker, shares, price });
+      }
+
+      document.getElementById('k401Ticker').value = '';
+      document.getElementById('k401Shares').value = '';
+      document.getElementById('k401Price').value = '';
+
+      saveData();
+      updateAll();
+    }
+
+    function delete401kHolding(index) {
+      if (confirm('Delete this holding?')) {
+        data.k401.holdings.splice(index, 1);
+        saveData();
+        updateAll();
+      }
+    }
+
+    function calculateCheckingBalance() {
+      const transactionTotal = data.checking.transactions.reduce((sum, t) => {
+        return sum + (t.type === 'income' ? t.amount : -t.amount);
+      }, 0);
+      return data.checking.startingBalance + transactionTotal;
+    }
+
+    function calculateTotalIncome() {
+      const filtered = getFilteredTransactions();
+      return filtered
+        .filter(t => t.type === 'income')
+        .reduce((sum, t) => sum + t.amount, 0);
+    }
+
+    function calculateTotalExpenses() {
+      const filtered = getFilteredTransactions();
+      return filtered
+        .filter(t => t.type === 'expense')
+        .reduce((sum, t) => sum + t.amount, 0);
+    }
+
+    function calculateRothValue() {
+      return data.rothIRA.holdings.reduce((sum, h) => sum + (h.shares * h.price), 0);
+    }
+
+    function calculate401kValue() {
+      return data.k401.holdings.reduce((sum, h) => sum + (h.shares * h.price), 0);
+    }
+
+    function updateAll() {
+      const checkingBalance = calculateCheckingBalance();
+      const rothValue = calculateRothValue();
+      const k401Value = calculate401kValue();
+      const totalNetWorth = checkingBalance + rothValue + k401Value;
+
+      document.getElementById('totalNetWorth').textContent = formatCurrency(totalNetWorth);
+      document.getElementById('checkingBalance').textContent = formatCurrency(checkingBalance);
+      document.getElementById('totalIncome').textContent = formatCurrency(calculateTotalIncome());
+      document.getElementById('totalExpenses').textContent = formatCurrency(calculateTotalExpenses());
+      
+      document.getElementById('rothValue').textContent = formatCurrency(rothValue);
+      document.getElementById('rothContributions').textContent = formatCurrency(data.rothIRA.contributions);
+      document.getElementById('rothGainLoss').textContent = formatCurrency(rothValue - data.rothIRA.contributions);
+
+      document.getElementById('k401Value').textContent = formatCurrency(k401Value);
+      document.getElementById('k401Contributions').textContent = formatCurrency(data.k401.contributions);
+      document.getElementById('k401GainLoss').textContent = formatCurrency(k401Value - data.k401.contributions);
+
+      updateTransactionList();
+      updateRothHoldingList();
+      update401kHoldingList();
+      
+      saveSnapshot(checkingBalance, rothValue, k401Value, totalNetWorth);
+      updateCharts();
+    }
+
+    function updateTransactionList() {
+      const list = document.getElementById('transactionList');
+      const filtered = getFilteredTransactions();
+      
+      if (filtered.length === 0) {
+        list.innerHTML = '<p style="text-align: center; color: #999; padding: 20px;">No transactions for this period</p>';
+        return;
+      }
+
+      const sorted = [...filtered].sort((a, b) => new Date(b.date) - new Date(a.date));
+
+      list.innerHTML = sorted.map((t, i) => {
+        const originalIndex = data.checking.transactions.indexOf(t);
+        return `
+          <div class="transaction-item ${t.type === 'income' ? 'transaction-income' : 'transaction-expense'}">
+            <div class="transaction-details">
+              <div class="transaction-type">${t.type === 'income' ? '💰' : '💸'} ${t.description}</div>
+              <div class="transaction-date">${formatDate(t.date)}</div>
+            </div>
+            <div>
+              <span class="transaction-amount ${t.type === 'income' ? 'amount-positive' : 'amount-negative'}">
+                ${t.type === 'income' ? '+' : '-'}${formatCurrency(t.amount)}
+              </span>
+              <button class="delete-btn" onclick="deleteTransaction(${originalIndex})">Delete</button>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function updateRothHoldingList() {
+      const list = document.getElementById('rothHoldingList');
+      if (data.rothIRA.holdings.length === 0) {
+        list.innerHTML = '<p style="text-align: center; color: #999; padding: 20px;">No holdings yet</p>';
+        return;
+      }
+
+      list.innerHTML = data.rothIRA.holdings.map((h, i) => {
+        const value = h.shares * h.price;
+        return `
+          <div class="holding-item">
+            <div style="flex: 1;">
+              <div style="font-weight: bold; font-size: 1.1em; margin-bottom: 10px;">${h.ticker}</div>
+              <div class="holding-info">
+                <div><span class="holding-label">Shares:</span> <span class="holding-value">${h.shares.toFixed(4)}</span></div>
+                <div><span class="holding-label">Price:</span> <span class="holding-value">${formatCurrency(h.price)}</span></div>
+                <div><span class="holding-label">Value:</span> <span class="holding-value">${formatCurrency(value)}</span></div>
+              </div>
+            </div>
+            <button class="delete-btn" onclick="deleteRothHolding(${i})">Delete</button>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function update401kHoldingList() {
+      const list = document.getElementById('k401HoldingList');
+      if (data.k401.holdings.length === 0) {
+        list.innerHTML = '<p style="text-align: center; color: #999; padding: 20px;">No holdings yet</p>';
+        return;
+      }
+
+      list.innerHTML = data.k401.holdings.map((h, i) => {
+        const value = h.shares * h.price;
+        return `
+          <div class="holding-item">
+            <div style="flex: 1;">
+              <div style="font-weight: bold; font-size: 1.1em; margin-bottom: 10px;">${h.ticker}</div>
+              <div class="holding-info">
+                <div><span class="holding-label">Shares:</span> <span class="holding-value">${h.shares.toFixed(4)}</span></div>
+                <div><span class="holding-label">Price:</span> <span class="holding-value">${formatCurrency(h.price)}</span></div>
+                <div><span class="holding-label">Value:</span> <span class="holding-value">${formatCurrency(value)}</span></div>
+              </div>
+            </div>
+            <button class="delete-btn" onclick="delete401kHolding(${i})">Delete</button>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function saveSnapshot(checking, roth, k401, total) {
+      const today = new Date().toISOString().split('T')[0];
+      const existingIndex = data.history.findIndex(h => h.date.startsWith(today));
+      
+      const snapshot = {
+        date: new Date().toISOString(),
+        checking,
+        roth,
+        k401,
+        total
+      };
+
+      if (existingIndex >= 0) {
+        data.history[existingIndex] = snapshot;
+      } else {
+        data.history.push(snapshot);
+      }
+
+      if (data.history.length > 365) {
+        data.history = data.history.slice(-365);
+      }
+    }
+
+    function initCharts() {
+      const networthCtx = document.getElementById('networthChart').getContext('2d');
+      networthChart = new Chart(networthCtx, {
+        type: 'line',
+        data: {
+          labels: [],
+          datasets: [{
+            label: 'Net Worth',
+            data: [],
+            borderColor: '#667eea',
+            backgroundColor: 'rgba(102, 126, 234, 0.1)',
+            tension: 0.4,
+            fill: true
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: true,
+          plugins: {
+            legend: { display: false }
+          },
+          scales: {
+            y: {
+              beginAtZero: true,
+              ticks: {
+                callback: function(value) {
+                  return ' + value.toLocaleString();
+                }
+              }
+            }
+          }
+        }
+      });
+
+      const breakdownCtx = document.getElementById('breakdownChart').getContext('2d');
+      breakdownChart = new Chart(breakdownCtx, {
+        type: 'doughnut',
+        data: {
+          labels: ['Checking', 'Roth IRA', '401k'],
+          datasets: [{
+            data: [0, 0, 0],
+            backgroundColor: ['#3498db', '#27ae60', '#9b59b6']
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: true,
+          plugins: {
+            legend: {
+              position: 'bottom'
+            }
+          }
+        }
+      });
+
+      const incomeExpenseCtx = document.getElementById('incomeExpenseChart').getContext('2d');
+      incomeExpenseChart = new Chart(incomeExpenseCtx, {
+        type: 'doughnut',
+        data: {
+          labels: ['Income', 'Expenses'],
+          datasets: [{
+            data: [0, 0],
+            backgroundColor: ['#27ae60', '#e74c3c']
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: true,
+          plugins: {
+            legend: {
+              position: 'bottom'
+            }
+          }
+        }
+      });
+    }
+
+    function updateCharts() {
+      const sortedHistory = [...data.history].sort((a, b) => new Date(a.date) - new Date(b.date));
+      const last30 = sortedHistory.slice(-30);
+
+      networthChart.data.labels = last30.map(h => formatDateShort(h.date));
+      networthChart.data.datasets[0].data = last30.map(h => h.total);
+      networthChart.update();
+
+      const checkingBalance = calculateCheckingBalance();
+      const rothValue = calculateRothValue();
+      const k401Value = calculate401kValue();
+
+      breakdownChart.data.datasets[0].data = [checkingBalance, rothValue, k401Value];
+      breakdownChart.update();
+
+      const totalIncome = calculateTotalIncome();
+      const totalExpenses = calculateTotalExpenses();
+
+      incomeExpenseChart.data.datasets[0].data = [totalIncome, totalExpenses];
+      incomeExpenseChart.update();
+    }
+
+    function formatCurrency(amount) {
+      return new Intl.NumberFormat('en-US', {
+        style: 'currency',
+        currency: 'USD'
+      }).format(amount);
+    }
+
+    function formatDate(dateString) {
+      const date = new Date(dateString);
+      return date.toLocaleString('en-US', {
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric',
+        hour: 'numeric',
+        minute: '2-digit',
+        hour12: true
+      });
+    }
+
+    function formatDateShort(dateString) {
+      const date = new Date(dateString);
+      return date.toLocaleDateString('en-US', {
+        month: 'short',
+        day: 'numeric'
+      });
+    }
+
+    function saveData() {
+      localStorage.setItem('networthTrackerData', JSON.stringify(data));
+    }
+
+    function loadData() {
+      const saved = localStorage.getItem('networthTrackerData');
+      if (saved) {
+        const loadedData = JSON.parse(saved);
+        // Merge with default structure to handle new fields
+        data = {
+          checking: {
+            startingBalance: 0,
+            transactions: [],
+            ...loadedData.checking
+          },
+          rothIRA: {
+            holdings: [],
+            contributions: 0,
+            ...loadedData.rothIRA
+          },
+          k401: {
+            holdings: [],
+            contributions: 0,
+            ...loadedData.k401
+          },
+          history: loadedData.history || [],
+          commonDescriptions: loadedData.commonDescriptions || data.commonDescriptions
+        };
+      }
+    }
+  </script>
+</body>
+</html>
